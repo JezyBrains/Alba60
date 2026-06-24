@@ -2,6 +2,7 @@
 
 import { useLanguage } from "@/lib/LanguageContext";
 import PlayingCard from "./PlayingCard";
+import type { CardData } from "@/lib/types";
 
 interface OpponentAreaProps {
   cardCount: number;
