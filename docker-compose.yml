@@ -22,8 +22,10 @@ services:
     build:
       context: ./turufu-advisor/frontend
       args:
-        - NEXT_PUBLIC_API_URL=http://${ALBA_DOMAIN:-localhost}:8000
-        - NEXT_PUBLIC_WS_URL=ws://${ALBA_DOMAIN:-localhost}:8000/ws/game
+        # Frontend (browser) connects to backend directly on port 8000
+        # Using the raw IP so WebSocket bypass Traefik (avoids WS proxy config)
+        - NEXT_PUBLIC_API_URL=http://144.91.69.240:8000
+        - NEXT_PUBLIC_WS_URL=ws://144.91.69.240:8000/ws/game
     container_name: alba60-frontend
     ports:
       - "3000:3000"
