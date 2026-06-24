@@ -8,14 +8,16 @@ import type { CardData } from "@/lib/types";
 interface OpponentLoggerProps {
   onCardSelected: (card: CardData) => void;
   onClose?: () => void;
+  unavailableCards?: Set<string>;
 }
 
 /**
  * Compact bottom-sheet for logging the opponent's played card.
  * Shows a 4×9 grid (suit rows × rank cols) as large tap targets.
  * Selecting a card immediately fires the callback — no confirm needed.
+ * Cards already played/in-hand are greyed out and not selectable.
  */
-export default function OpponentLogger({ onCardSelected, onClose }: OpponentLoggerProps) {
+export default function OpponentLogger({ onCardSelected, onClose, unavailableCards }: OpponentLoggerProps) {
   const { t } = useLanguage();
 
   const handleTap = (card: CardData) => {
@@ -56,16 +58,20 @@ export default function OpponentLogger({ onCardSelected, onClose }: OpponentLogg
                 {RANKS.map((rank) => {
                   const card: CardData = { suit, rank };
                   const key = cardKey(card);
+                  const isUsed = unavailableCards?.has(key) ?? false;
 
                   return (
                     <button
                       key={key}
-                      onPointerDown={() => handleTap(card)}
+                      disabled={isUsed}
+                      onPointerDown={() => { if (!isUsed) handleTap(card); }}
                       className={`
                         flex-1 h-10 rounded-lg text-xs font-bold
-                        transition-all duration-200 active:scale-90 border
-                        bg-game-glass border-game-border text-ink-muted hover:bg-game-glassHover hover:text-white
-                        active:shadow-neon
+                        transition-all duration-200 border
+                        ${isUsed
+                          ? "bg-game-bg/30 border-game-border/30 text-ink-dim/30 line-through cursor-not-allowed opacity-40"
+                          : "bg-game-glass border-game-border text-ink-muted hover:bg-game-glassHover hover:text-white active:scale-90 active:shadow-neon"
+                        }
                       `}
                     >
                       {rank}

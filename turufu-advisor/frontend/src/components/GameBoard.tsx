@@ -33,6 +33,20 @@ export default function GameBoard() {
     return cardKey(advice.best_card);
   }, [advice]);
 
+  // Cards that are unavailable for drawing (already played, in hand, or known opponent)
+  const unavailableCards = useMemo(() => {
+    const keys = new Set<string>();
+    // Cards already played in the game
+    for (const c of state?.played_cards || []) keys.add(cardKey(c));
+    // Cards currently in user's hand
+    for (const c of state?.user_hand || []) keys.add(cardKey(c));
+    // Cards in the current trick (being played right now)
+    for (const tp of state?.current_trick || []) keys.add(cardKey(tp.card));
+    // Known opponent hand cards
+    for (const c of state?.opponent_known_hand || []) keys.add(cardKey(c));
+    return keys;
+  }, [state?.played_cards, state?.user_hand, state?.current_trick, state?.opponent_known_hand]);
+
   // Sync inputMode to backend turn_index
   useEffect(() => {
     if (state && phase === "playing") {
@@ -291,7 +305,7 @@ export default function GameBoard() {
               />
             ) : (
               /* Log opponent's card */
-              <OpponentLogger onCardSelected={handleOpponentCard} />
+              <OpponentLogger onCardSelected={handleOpponentCard} unavailableCards={unavailableCards} />
             )}
           </>
         )}
@@ -315,11 +329,14 @@ export default function GameBoard() {
                       {["A","7","K","J","Q","6","5","4","3"].map((rank) => {
                         const key = `${rank}_${suit}`;
                         const isSel = drawSelected.has(key);
+                        const isUsed = unavailableCards.has(key);
                         const needed = Math.min(HAND_SIZE - (state?.user_hand.length || 0), state?.draw_pile_size || 0);
                         return (
                           <button
                             key={key}
+                            disabled={isUsed}
                             onClick={() => {
+                              if (isUsed) return;
                               setDrawSelected(prev => {
                                 const next = new Set(prev);
                                 if (next.has(key)) { next.delete(key); }
@@ -328,12 +345,14 @@ export default function GameBoard() {
                               });
                             }}
                             className={`
-                              flex-1 h-10 rounded-lg text-xs font-bold transition-all duration-200 active:scale-90 border
-                              ${isSel
-                                ? isRed
-                                  ? "bg-suit-red border-suit-red text-white shadow-neonDanger"
-                                  : "bg-white border-white text-game-bg shadow-glass"
-                                : "bg-game-glass border-game-border text-ink-muted hover:bg-game-glassHover hover:text-white"
+                              flex-1 h-10 rounded-lg text-xs font-bold transition-all duration-200 border
+                              ${isUsed
+                                ? "bg-game-bg/30 border-game-border/30 text-ink-dim/30 line-through cursor-not-allowed opacity-40"
+                                : isSel
+                                  ? isRed
+                                    ? "bg-suit-red border-suit-red text-white shadow-neonDanger active:scale-90"
+                                    : "bg-white border-white text-game-bg shadow-glass active:scale-90"
+                                  : "bg-game-glass border-game-border text-ink-muted hover:bg-game-glassHover hover:text-white active:scale-90"
                               }
                             `}
                           >

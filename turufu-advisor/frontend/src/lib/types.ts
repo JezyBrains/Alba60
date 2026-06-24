@@ -40,6 +40,7 @@ export interface GameSnapshot {
   tricks_won: Record<number, number>;
   current_trick: TrickPlay[];
   cards_played_total: number;
+  played_cards: CardData[];
   cards_remaining_unknown: number;
   opponent_known_hand: CardData[];
   mrithi: MrithiStatus;

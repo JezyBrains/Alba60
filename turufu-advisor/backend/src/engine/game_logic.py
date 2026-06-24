@@ -513,6 +513,7 @@ class GameState:
                 for tp in self.current_trick.plays
             ],
             "cards_played_total": len(self.played_cards),
+            "played_cards": [c.to_dict() for c in self.played_cards],
             "cards_remaining_unknown": len(self.remaining_unknown),
             # When draw pile is empty, remaining_unknown = exactly the opponent's hand.
             # Only reveal if the count matches to avoid showing stale/corrupt data.
