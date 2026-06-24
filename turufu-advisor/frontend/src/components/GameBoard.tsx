@@ -68,15 +68,14 @@ export default function GameBoard() {
   }, [lastTrickResult]);
 
   // When server says user must draw, show the draw sheet
-  // But skip if there's nothing to draw (pile empty or hand full)
+  // NOTE: draw_pile_size is ALREADY decremented by the server in _resolve_trick(),
+  // so we must NOT use it to cap 'needed'. The server set user_draw_pending=true
+  // precisely because the user drew cards — we just need to know WHICH cards.
   useEffect(() => {
     if (state?.user_draw_pending && phase === "playing" && !showTrickOverlay) {
-      const needed = Math.min(
-        HAND_SIZE - (state?.user_hand?.length || 0),
-        state?.draw_pile_size || 0
-      );
+      const needed = HAND_SIZE - (state?.user_hand?.length || 0);
       if (needed <= 0) {
-        // Nothing to draw — send empty draw to clear the pending flag
+        // Hand is already full (e.g. bottom trump was auto-registered)
         drawCards([]);
         return;
       }
@@ -365,7 +364,7 @@ export default function GameBoard() {
                         const key = `${rank}_${suit}`;
                         const isSel = drawSelected.has(key);
                         const isUsed = unavailableCards.has(key);
-                        const needed = Math.min(HAND_SIZE - (state?.user_hand.length || 0), state?.draw_pile_size || 0);
+                        const needed = HAND_SIZE - (state?.user_hand.length || 0);
                         return (
                           <button
                             key={key}
