@@ -287,6 +287,16 @@ async def game_socket(websocket: WebSocket):
                 if msg_type == "play":
                     card = validate_card(msg["card"]["suit"], msg["card"]["rank"])
                     trick_result = game.play_card(msg["player_id"], card)
+                    # Debug: trace trick resolution
+                    print(f"[PLAY] P{msg['player_id']} → {card.rank}{card.suit[0]} | "
+                          f"trump={game.trump_suit} | trick_plays={len(game.current_trick.plays)}")
+                    if trick_result:
+                        plays_str = " vs ".join(
+                            f"P{tp.player_id}:{tp.card.rank}{tp.card.suit[0]}"
+                            for tp in game.tricks_history[-1].plays
+                        )
+                        print(f"[TRICK] {plays_str} → Winner: P{trick_result['trick_winner']} "
+                              f"+{trick_result['points_won']}pts")
                     if _logger:
                         _logger.log_play(
                             player_id=msg["player_id"],
