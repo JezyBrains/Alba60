@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ----------------------------------------------------------------
+   Albastini — Premium UNO-Style Dark Theme
+   ---------------------------------------------------------------- */
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: #080A0F;
+  }
+
+  ::selection {
+    background: #00FF9D;
+    color: #080A0F;
+  }
+}
+
+/* Dark game background with subtle glowing orbs for depth */
+body {
+  background: #080A0F radial-gradient(circle at 15% 50%, rgba(0, 255, 157, 0.03), transparent 25%),
+              radial-gradient(circle at 85% 30%, rgba(255, 42, 85, 0.03), transparent 25%) !important;
+  color: #FFFFFF;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overscroll-behavior: none;
+}
+
+
+@layer components {
+  /* ---- Playing Card ---- */
+  .card-face {
+    @apply relative flex flex-col justify-between
+           rounded-xl bg-white
+           select-none cursor-pointer
+           transition-all duration-300;
+    transition-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.5);
+  }
+
+  .card-face:active {
+    transform: translateY(-4px) scale(1.02);
+  }
+
+  .card-face.recommended {
+    box-shadow:
+      0 0 0 2px #00FF9D,
+      0 0 20px rgba(0, 255, 157, 0.4),
+      0 8px 24px rgba(0,0,0,0.6);
+    transform: translateY(-8px);
+  }
+
+  .card-face.selected {
+    transform: translateY(-12px);
+    box-shadow: 0 0 0 2px #FFFFFF, 0 10px 30px rgba(0,0,0,0.7);
+  }
+
+  /* ---- Card Back ---- */
+  .card-back {
+    @apply relative rounded-xl select-none;
+    background: linear-gradient(135deg, #1C2230 0%, #0F131C 100%);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05);
+  }
+
+  .card-back::after {
+    content: "♦";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+    color: rgba(255,255,255,0.04);
+  }
+
+  /* ---- Felt Table ---- */
+  .felt-table {
+    background:
+      radial-gradient(ellipse at 50% 50%, #154D30 0%, #0B301D 60%, #051A0E 100%);
+    box-shadow: inset 0 20px 50px rgba(0,0,0,0.5);
+  }
+
+  /* ---- Glass Panels ---- */
+  .glass-panel {
+    @apply backdrop-blur-xl border rounded-2xl;
+    background-color: rgba(18, 22, 32, 0.65);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* ---- Oracle Panel ---- */
+  .oracle-panel {
+    @apply glass-panel;
+    background: linear-gradient(135deg, rgba(0, 255, 157, 0.08) 0%, rgba(0, 255, 157, 0.02) 100%);
+    border: 1px solid rgba(0, 255, 157, 0.15);
+  }
+
+  /* ---- Score Bar ---- */
+  .score-bar-track {
+    @apply relative w-full rounded-full overflow-hidden;
+    background: rgba(255,255,255,0.05);
+    height: 6px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+  }
+
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* ---- Suit colors ---- */
+  .suit-red  { color: #FF2A55; }
+  .suit-black { color: #121620; }
+}
+
+@layer utilities {
+  .safe-area-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+  .bg-game { background: transparent; }
+}
+
+/* ---- Animations ---- */
+@keyframes fadeIn {
+  from { opacity: 0; filter: blur(4px); }
+  to   { opacity: 1; filter: blur(0); }
+}
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes cardPlay {
+  0%   { transform: scale(1) translateY(0); }
+  50%  { transform: scale(1.05) translateY(-8px); }
+  100% { transform: scale(1) translateY(0); }
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px #00FF9D, 0 0 15px rgba(0,255,157,0.3); }
+  50%       { box-shadow: 0 0 0 2px #00FF9D, 0 0 25px rgba(0,255,157,0.6); }
+}
+
+.animate-fade-in   { animation: fadeIn  0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-slide-up  { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-card-play { animation: cardPlay 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-glow      { animation: glow-pulse 2.5s ease-in-out infinite; }
