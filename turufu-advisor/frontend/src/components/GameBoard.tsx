@@ -68,8 +68,18 @@ export default function GameBoard() {
   }, [lastTrickResult]);
 
   // When server says user must draw, show the draw sheet
+  // But skip if there's nothing to draw (pile empty or hand full)
   useEffect(() => {
     if (state?.user_draw_pending && phase === "playing" && !showTrickOverlay) {
+      const needed = Math.min(
+        HAND_SIZE - (state?.user_hand?.length || 0),
+        state?.draw_pile_size || 0
+      );
+      if (needed <= 0) {
+        // Nothing to draw — send empty draw to clear the pending flag
+        drawCards([]);
+        return;
+      }
       setShowDrawSheet(true);
       setPhase("drawing");
     }
