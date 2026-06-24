@@ -59,3 +59,10 @@ HAND_SIZE = 6               # Players always hold exactly 6 cards
 MAX_PLAYERS = 6
 DEFAULT_PLAYERS = 2
 DEALER_PLAYER_ID = 1        # Opponent is the dealer and leads the first trick
+
+# ---------------------------------------------------------------------------
+# Draw pile & Bottom Trump
+# ---------------------------------------------------------------------------
+DRAW_PILE_INITIAL = 24      # 36 - (6*2) = 24 cards: 23 face-down + 1 face-up
+BOTTOM_TRUMP_TRIGGER = 2    # When pile reaches 2, last draw triggers bottom trump
+ENDGAME_TRICKS = 6          # After pile empties: 6 tricks of perfect information

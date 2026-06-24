@@ -90,12 +90,20 @@ export default function GameBoard() {
   }, [state?.game_over]);
 
   // Init game
-  const handleInitialize = useCallback(async (trumpSuit: string, hand: CardData[]) => {
+  const handleInitialize = useCallback(async (trumpSuit: string, hand: CardData[], bottomTrump?: CardData) => {
     try {
+      const body: Record<string, unknown> = {
+        trump_suit: trumpSuit,
+        user_hand: hand,
+        num_players: 2,
+      };
+      if (bottomTrump) {
+        body.bottom_trump_card = bottomTrump;
+      }
       const res = await fetch(`${API_URL}/game/init`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trump_suit: trumpSuit, user_hand: hand, num_players: 2 }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         const data = await res.json();
@@ -239,6 +247,8 @@ export default function GameBoard() {
           card: tp.card,
         }))}
         drawPileSize={state?.draw_pile_size || 0}
+        bottomTrumpCard={state?.bottom_trump_card}
+        bottomTrumpDrawnBy={state?.bottom_trump_drawn_by}
       />
 
       {/* ---- ENDGAME BANNER ---- */}

@@ -60,6 +60,7 @@ class InitGameRequest(BaseModel):
     trump_suit: str
     user_hand: List[CardModel]
     num_players: int = 2
+    bottom_trump_card: Optional[CardModel] = None
 
 
 class EngineConfigRequest(BaseModel):
@@ -90,7 +91,7 @@ def to_card(model: CardModel) -> Card:
 
 
 def run_advice() -> Dict:
-    """Execute IS-MCTS and format the result for the client."""
+    """Execute IS-MCTS (or Minimax in endgame) and format for the client."""
     result = engine.find_best_move(game)
     best = result.get("best_card")
     return {
@@ -100,6 +101,7 @@ def run_advice() -> Dict:
         "determinizations_completed": result.get("determinizations_completed", 0),
         "all_moves": result.get("all_moves", []),
         "mrithi_viable": result.get("mrithi_viable", False),
+        "solver": result.get("solver", "ismcts"),
     }
 
 
@@ -147,11 +149,18 @@ def init_game(req: InitGameRequest):
     _current_game_id = game_id
 
     user_hand = [to_card(c) for c in req.user_hand]
+
+    # Bottom Trump card (optional — the face-up card at the bottom of the draw pile)
+    bottom_trump: Card | None = None
+    if req.bottom_trump_card:
+        bottom_trump = to_card(req.bottom_trump_card)
+
     game = GameState(num_players=req.num_players)
     game.initialize(
         trump_suit=req.trump_suit,
         user_hand=user_hand,
         num_players=req.num_players,
+        bottom_trump_card=bottom_trump,
     )
 
     # Start logging this game

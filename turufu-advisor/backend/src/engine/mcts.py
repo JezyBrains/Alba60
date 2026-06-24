@@ -12,13 +12,13 @@ perfect information. IS-MCTS handles this by:
 3. AGGREGATE: Repeat across many determinizations. The move that performs
    best *across all possible worlds* is the mathematically optimal play.
 
-The heuristic evaluation is dual-objective:
-- PRIMARY: Maximize own points toward the 61-point win threshold.
-- SECONDARY (Mrithi): If feasible, starve the opponent below 10 points
-  for a 2-VP victory. This changes the AI from "win" to "win big."
+Phase 3 Upgrades:
+- CACHED BAYESIAN DETERMINIZATION: Weights computed once per turn, not per sim.
+- DYNAMIC ΔP TRICK 12 HEURISTIC: Only lose trick 12 if bottom trump value > trick value.
+- ENDGAME MINIMAX HARD FORK: When draw_pile == 0, switch to alpha-beta for perfect play.
 
 Performance notes for M3 Max:
-- 36-card deck with 5-card hands = very tractable game tree.
+- 36-card deck with 6-card hands = very tractable game tree.
 - No follow-suit = higher branching factor but shallower depth.
 - M3 Max (36GB): 200 determinizations × 200 sims = 40,000 playouts target.
 - Time budget: 300ms hard cap for zero-lag mobile UX.
@@ -34,11 +34,13 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
 
 from .game_logic import GameState, Card, Trick, TrickPlay
+from .minimax import EndgameSolver
 from .constants import (
     WIN_THRESHOLD,
     MRITHI_THRESHOLD,
     TOTAL_DECK_POINTS,
     HAND_SIZE,
+    BOTTOM_TRUMP_TRIGGER,
 )
 
 # ---------------------------------------------------------------------------
@@ -126,7 +128,8 @@ def evaluate_terminal(state: GameState, maximizing_player: int = 0) -> float:
 def evaluate_state(state: GameState, maximizing_player: int = 0) -> float:
     """
     Non-terminal state evaluation for early cutoff in deep simulations.
-    Combines current score advantage with Mrithi opportunity assessment.
+    Combines current score advantage with Mrithi opportunity and
+    the DYNAMIC ΔP Trick 12 Bottom Trump heuristic.
     """
     user = state.players[maximizing_player]
     opponents = [p for p in state.players if p.player_id != maximizing_player]
@@ -147,9 +150,25 @@ def evaluate_state(state: GameState, maximizing_player: int = 0) -> float:
         and best_opp.points_captured < MRITHI_THRESHOLD
         and points_remaining < 30
     ):
-        # Mrithi is achievable — boost evaluation significantly
         skunk_feasibility = 1.0 - (best_opp.points_captured / MRITHI_THRESHOLD)
         score += 0.3 * skunk_feasibility
+
+    # --- DYNAMIC ΔP TRICK 12 BOTTOM TRUMP HEURISTIC ---
+    # When draw_pile == 2, the loser of this trick gets the bottom trump.
+    # Only recommend losing if: ΔP = P_bottom_trump - P_trick_loss > 0
+    if (
+        state.draw_pile_size == BOTTOM_TRUMP_TRIGGER
+        and state.bottom_trump_card is not None
+    ):
+        bottom_value = state.bottom_trump_card.points  # 0-11
+        # Estimate trick value from cards already on the table
+        trick_value = state.current_trick.points if state.current_trick.plays else 0
+        delta_p = bottom_value - trick_value
+
+        if delta_p > 0:
+            # Worth losing this trick to get the bottom trump
+            # Scale bonus by how much better the bottom trump is
+            score += 0.15 * (delta_p / 11.0)
 
     return score
 
@@ -190,18 +209,15 @@ def random_playout(state: GameState, maximizing_player: int = 0) -> float:
 
 
 # ---------------------------------------------------------------------------
-# IS-MCTS Engine
+# IS-MCTS Engine with Endgame Minimax Hard Fork
 # ---------------------------------------------------------------------------
 class ISMCTSEngine:
     """
     Information Set Monte Carlo Tree Search engine for Albastini.
 
-    The key insight: since we can't see opponent hands, we run MCTS across
-    multiple "determinizations" — randomly sampled possible card distributions
-    that are consistent with what we've observed (played cards, void suits).
-
-    The best move is the one that performs well across ALL possible worlds,
-    not just one lucky guess.
+    Phase 3 architecture:
+    - draw_pile > 0: IS-MCTS with cached Bayesian determinization
+    - draw_pile == 0: Alpha-Beta Minimax (perfect information solver)
     """
 
     def __init__(
@@ -213,19 +229,15 @@ class ISMCTSEngine:
         self.num_determinizations = num_determinizations
         self.simulations_per_det = simulations_per_det
         self.time_limit_ms = time_limit_ms
+        self.endgame_solver = EndgameSolver()
 
     def find_best_move(self, game_state: GameState) -> Dict:
         """
-        Run IS-MCTS and return the best card to play.
+        Run the appropriate solver and return the best card to play.
 
-        Returns:
-            {
-                "best_card": Card,
-                "win_probability": float,
-                "simulations_run": int,
-                "all_moves": [{card, visits, avg_reward}, ...],
-                "mrithi_viable": bool,
-            }
+        HARD FORK:
+        - draw_pile > 0 → IS-MCTS with Bayesian determinization
+        - draw_pile == 0 → Alpha-Beta Minimax (exact solve)
         """
         if game_state.turn_index != 0:
             return {"best_card": None, "win_probability": 0.0, "simulations_run": 0}
@@ -241,12 +253,29 @@ class ISMCTSEngine:
                 "simulations_run": 0,
                 "all_moves": [{"card": user_hand[0].to_dict(), "visits": 1, "avg_reward": 0}],
                 "mrithi_viable": False,
+                "solver": "forced",
             }
+
+        # ── HARD FORK: Perfect Information → Minimax ──
+        if game_state.draw_pile_size == 0:
+            return self.endgame_solver.solve(game_state)
+
+        # ── Imperfect Information → IS-MCTS ──
+        return self._run_ismcts(game_state, user_hand)
+
+    def _run_ismcts(self, game_state: GameState, user_hand: List[Card]) -> Dict:
+        """
+        IS-MCTS with cached Bayesian determinization.
+        Weights are computed ONCE here, then passed to every determinization.
+        """
+        # ── PRE-COMPUTE Bayesian weights (cached for all determinizations) ──
+        cached_weights = game_state.compute_bayesian_weights()
 
         # Aggregate results across all determinizations
         move_scores: Dict[Card, List[float]] = {card: [] for card in user_hand}
         move_visits: Dict[Card, int] = {card: 0 for card in user_hand}
         total_sims = 0
+        det_count = 0
         start_time = time.time()
 
         for det_idx in range(self.num_determinizations):
@@ -255,8 +284,9 @@ class ISMCTSEngine:
             if elapsed_ms > self.time_limit_ms:
                 break
 
-            # Create a determinized state (randomly deal unknown cards)
-            det_state = game_state.create_determinization()
+            # Create determinized state with CACHED weights
+            det_state = game_state.create_determinization(cached_weights)
+            det_count += 1
 
             # Run MCTS on this determinized state
             root = MCTSNode(
@@ -339,7 +369,8 @@ class ISMCTSEngine:
             "best_card": best_card,
             "win_probability": round(win_prob, 4),
             "simulations_run": total_sims,
-            "determinizations_completed": min(det_idx + 1, self.num_determinizations),
+            "determinizations_completed": det_count,
             "all_moves": all_moves,
             "mrithi_viable": mrithi_viable,
+            "solver": "ismcts",
         }

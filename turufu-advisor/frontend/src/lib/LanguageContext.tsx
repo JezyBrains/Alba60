@@ -15,6 +15,9 @@ const DICT: Record<string, Record<Lang, string>> = {
   "setup.cardsSelected": { en: "cards selected", sw: "kadi zimechaguliwa" },
   "setup.startGame": { en: "Start Game", sw: "Anza Mchezo" },
   "setup.turufu": { en: "Turufu", sw: "Turufu" },
+  "setup.selectBottomTrump": { en: "Select the Bottom Trump", sw: "Chagua Turufu ya Chini" },
+  "setup.bottomTrumpHint": { en: "The face-up card at the bottom of the draw pile. This sets the trump suit automatically.", sw: "Kadi inayoonekana chini ya rundo la kuchota. Hii inaweka turufu moja kwa moja." },
+  "setup.skipBottomTrump": { en: "Skip (manual trump selection)", sw: "Ruka (chagua turufu mwenyewe)" },
 
   // Game
   "game.yourPlay": { en: "Your play", sw: "Zamu yako" },

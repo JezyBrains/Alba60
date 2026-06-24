@@ -34,6 +34,7 @@ from .constants import (
     TOTAL_DECK_POINTS,
     DEFAULT_PLAYERS,
     DEALER_PLAYER_ID,
+    BOTTOM_TRUMP_TRIGGER,
 )
 
 
@@ -204,6 +205,14 @@ class GameState:
         self.round_number: int = 0
         self.user_draw_pending: bool = False  # True when user must register a drawn card
 
+        # Bottom Trump mechanic
+        self.bottom_trump_card: Optional[Card] = None   # Face-up card at bottom of draw pile
+        self.bottom_trump_drawn_by: Optional[int] = None  # Player who drew the bottom trump
+
+        # Bayesian tracking — suits opponent has failed to trump on
+        self.opponent_failed_to_trump: Set[str] = set()  # Suits where opp didn't play trump
+        self.opponent_played_suits: Set[str] = set()     # Suits opponent has played
+
     # ------------------------------------------------------------------
     # Initialization
     # ------------------------------------------------------------------
@@ -212,11 +221,14 @@ class GameState:
         trump_suit: str,
         user_hand: List[Card],
         num_players: int = DEFAULT_PLAYERS,
+        bottom_trump_card: Optional[Card] = None,
     ) -> None:
         """
         Set up a new game round.
         - trump_suit: The Turufu suit for this round.
         - user_hand: The 6 cards the human user was dealt.
+        - bottom_trump_card: The face-up card at the bottom of the draw pile
+          (visible to both players from the start).
         - The dealer (opponent, player 1) ALWAYS leads the first trick.
         """
         self.num_players = num_players
@@ -238,6 +250,16 @@ class GameState:
         self.played_cards = set()
         self.current_trick = Trick()
         self.tricks_history = []
+
+        # Bottom Trump — known to both players, so remove from unknown pool
+        self.bottom_trump_card = bottom_trump_card
+        self.bottom_trump_drawn_by = None
+        if bottom_trump_card and bottom_trump_card in self.remaining_unknown:
+            self.remaining_unknown.discard(bottom_trump_card)
+
+        # Bayesian tracking reset
+        self.opponent_failed_to_trump = set()
+        self.opponent_played_suits = set()
 
         # Dealer (opponent) leads the first trick
         self.current_leader = DEALER_PLAYER_ID
@@ -285,6 +307,22 @@ class GameState:
             
         self.players[player_id].actual_hand_size -= 1
 
+        # Bayesian tracking: record opponent's play behaviour
+        if player_id != 0:
+            self.opponent_played_suits.add(card.suit)
+            # If opponent followed (not leading) and the lead was a high-value
+            # non-trump card, and opponent did NOT play trump → evidence they
+            # lack trump cards
+            if self.current_trick.plays:  # There's already a lead card
+                lead_card = self.current_trick.plays[0].card
+                if (lead_card.suit != self.trump_suit
+                    and lead_card.points >= 10
+                    and card.suit != self.trump_suit
+                    and card.suit != lead_card.suit):
+                    # Opponent played off-suit on a high-value non-trump lead
+                    # Strong signal they don't have trump
+                    self.opponent_failed_to_trump.add(lead_card.suit)
+
         # Add to current trick
         self.current_trick.plays.append(TrickPlay(player_id, card))
 
@@ -319,6 +357,14 @@ class GameState:
         cards_drawn = 0
         user_drew = 0
         if self.draw_pile_size > 0:
+            # --- BOTTOM TRUMP MECHANIC ---
+            # When draw pile = 2 (last 2 cards), winner gets the face-down
+            # card and loser gets the face-up bottom trump
+            is_bottom_trump_draw = (
+                self.draw_pile_size == BOTTOM_TRUMP_TRIGGER
+                and self.bottom_trump_card is not None
+            )
+
             for pid in draw_order:
                 player = self.players[pid]
                 cards_to_draw = HAND_SIZE - player.actual_hand_size
@@ -326,11 +372,26 @@ class GameState:
                 self.draw_pile_size -= actual_draw
                 player.actual_hand_size += actual_draw
                 cards_drawn += actual_draw
-                if pid == 0:
-                    user_drew = actual_draw
-                # For user (player 0), drawn cards will be registered via API
+
+                # Bottom trump: loser automatically gets the known card
+                if is_bottom_trump_draw and pid == loser_id:
+                    self.bottom_trump_drawn_by = loser_id
+                    if pid == 0:
+                        # User is the loser — auto-register the bottom trump
+                        self.players[0].hand.add(self.bottom_trump_card)
+                        self.remaining_unknown.discard(self.bottom_trump_card)
+                        # Don't count this as a pending draw (it's known)
+                    else:
+                        # Opponent got the bottom trump — now we know it's
+                        # in their hand. Move it from unknown to known-opp.
+                        self.remaining_unknown.discard(self.bottom_trump_card)
+                elif pid == 0:
+                    user_drew += actual_draw
+                # For user (player 0), other drawn cards will be registered via API
                 # For opponents, cards remain in remaining_unknown
-            # Only require draw registration if the user actually drew cards
+
+            # Only require draw registration if the user actually drew
+            # unknown cards (bottom trump is auto-registered above)
             if user_drew > 0:
                 self.user_draw_pending = True
 
@@ -462,33 +523,95 @@ class GameState:
             "tricks_won": {p.player_id: p.tricks_won for p in self.players},
         }
 
-    def create_determinization(self) -> GameState:
+    def compute_bayesian_weights(self) -> Dict[Card, float]:
         """
-        Create a "possible world" for IS-MCTS by randomly dealing
-        the unknown cards to opponents, respecting void-suit constraints.
-        This is the key operation in Information Set MCTS.
+        Pre-compute a STATIC probability weight for each unknown card.
+        Called ONCE per turn by the MCTS engine, NOT inside the sim loop.
+        
+        Returns a dict mapping Card -> weight (higher = more likely opponent holds it).
+        
+        Evidence signals:
+        - opponent_failed_to_trump: opponent didn't play trump on a high-value lead
+          → reduce weight of trump cards by 0.2×
+        - opponent_played_suits: suits opponent has shown in play
+          → boost weight of cards in those suits by 1.3×
+        """
+        weights: Dict[Card, float] = {}
+        unknown = list(self.remaining_unknown)
+
+        # Exclude bottom trump (it's known information)
+        if self.bottom_trump_card:
+            unknown = [c for c in unknown if c != self.bottom_trump_card]
+
+        for c in unknown:
+            w = 1.0
+            if c.suit == self.trump_suit and self.opponent_failed_to_trump:
+                w *= 0.2
+            if c.suit in self.opponent_played_suits:
+                w *= 1.3
+            weights[c] = w
+
+        return weights
+
+    def create_determinization(
+        self,
+        cached_weights: Optional[Dict[Card, float]] = None,
+    ) -> GameState:
+        """
+        Create a \"possible world\" for IS-MCTS by dealing unknown cards
+        to opponents using pre-computed Bayesian weights.
+
+        The cached_weights dict is computed ONCE per turn by
+        compute_bayesian_weights() — NOT recalculated per determinization.
+        This is critical for Apple Silicon performance (M3 Max targets
+        200 determinizations × 200 sims in 300ms).
         """
         det = deepcopy(self)
 
-        # Collect all unknown cards
+        # Collect all unknown cards (excluding bottom trump)
         unknown = list(det.remaining_unknown)
-        random.shuffle(unknown)
+        if det.bottom_trump_card and det.bottom_trump_card in unknown:
+            unknown.remove(det.bottom_trump_card)
 
-        # Deal cards to opponents respecting void suits and hand size
         for player in det.players:
             if player.player_id == 0:
-                continue  # User's hand is known
+                continue
 
-            # Cards this opponent could hold (not void in any suit they've shown void in)
             eligible = [c for c in unknown if c.suit not in player.void_suits]
             cards_needed = player.actual_hand_size - len(player.hand)
             cards_needed = max(0, min(cards_needed, len(eligible)))
 
-            dealt = eligible[:cards_needed]
-            player.hand = player.hand.union(dealt)
+            if cards_needed <= 0:
+                continue
 
+            # Use cached weights if available, else uniform
+            if cached_weights:
+                ew = [cached_weights.get(c, 1.0) for c in eligible]
+            else:
+                ew = [1.0] * len(eligible)
+
+            # Weighted sampling without replacement
+            dealt = []
+            rem = list(eligible)
+            rem_w = list(ew)
+            for _ in range(cards_needed):
+                if not rem:
+                    break
+                total_w = sum(rem_w)
+                if total_w <= 0:
+                    idx = random.randint(0, len(rem) - 1)
+                else:
+                    idx = random.choices(
+                        range(len(rem)), weights=rem_w, k=1
+                    )[0]
+                dealt.append(rem[idx])
+                rem.pop(idx)
+                rem_w.pop(idx)
+
+            player.hand = player.hand.union(dealt)
             for c in dealt:
-                unknown.remove(c)
+                if c in unknown:
+                    unknown.remove(c)
 
         return det
 
@@ -517,6 +640,11 @@ class GameState:
             "cards_remaining_unknown": len(self.remaining_unknown),
             "user_hand_size": self.players[0].actual_hand_size,
             "opponent_hand_size": self.players[1].actual_hand_size,
+            # Bottom Trump info
+            "bottom_trump_card": (
+                self.bottom_trump_card.to_dict() if self.bottom_trump_card else None
+            ),
+            "bottom_trump_drawn_by": self.bottom_trump_drawn_by,
             # When draw pile is empty, remaining_unknown = exactly the opponent's hand.
             # Only reveal if the count matches to avoid showing stale/corrupt data.
             "opponent_known_hand": (

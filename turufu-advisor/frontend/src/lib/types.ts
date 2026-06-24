@@ -44,6 +44,8 @@ export interface GameSnapshot {
   cards_remaining_unknown: number;
   user_hand_size: number;
   opponent_hand_size: number;
+  bottom_trump_card: CardData | null;
+  bottom_trump_drawn_by: number | null;
   opponent_known_hand: CardData[];
   mrithi: MrithiStatus;
   win_status: WinStatus;
@@ -63,6 +65,7 @@ export interface AdvicePayload {
   determinizations_completed?: number;
   all_moves: MoveEvaluation[];
   mrithi_viable: boolean;
+  solver?: "ismcts" | "minimax" | "forced";
 }
 
 export interface TrickResult {
