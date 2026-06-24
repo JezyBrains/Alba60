@@ -216,7 +216,7 @@ export default function GameBoard() {
 
       {/* ---- OPPONENT AREA ---- */}
       <OpponentArea
-        cardCount={HAND_SIZE - (state?.current_trick.filter(t => t.player === 1).length || 0)}
+        cardCount={state?.opponent_hand_size ?? 0}
         points={oppPts}
         tricks={state?.tricks_won?.[1] || 0}
         isTheirTurn={inputMode === "opponent"}
@@ -240,6 +240,21 @@ export default function GameBoard() {
         }))}
         drawPileSize={state?.draw_pile_size || 0}
       />
+
+      {/* ---- ENDGAME BANNER ---- */}
+      {state && state.draw_pile_size === 0 && !state.game_over && (
+        <div className="mx-3 mt-2 px-4 py-2 rounded-xl bg-oracle-glow/10 border border-oracle-glow/30 flex items-center justify-between animate-fade-in">
+          <span className="text-oracle-glow text-[0.6rem] font-bold tracking-[0.2em] uppercase">
+            ⚡ {t("game.endgame") || "Endgame"}
+          </span>
+          <span className="text-ink-muted text-[0.6rem] tracking-wider">
+            {state.user_hand.length} vs {state.opponent_hand_size} {t("game.cardsLeft") || "cards left"}
+          </span>
+          <span className={`text-[0.65rem] font-bold ${userPts > oppPts ? "text-oracle-glow" : userPts < oppPts ? "text-oracle-danger" : "text-ink-muted"}`}>
+            {userPts} – {oppPts}
+          </span>
+        </div>
+      )}
 
       {/* ---- ORACLE PANEL ---- */}
       {inputMode === "user" && advice?.best_card && (

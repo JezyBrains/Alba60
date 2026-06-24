@@ -42,6 +42,8 @@ export interface GameSnapshot {
   cards_played_total: number;
   played_cards: CardData[];
   cards_remaining_unknown: number;
+  user_hand_size: number;
+  opponent_hand_size: number;
   opponent_known_hand: CardData[];
   mrithi: MrithiStatus;
   win_status: WinStatus;

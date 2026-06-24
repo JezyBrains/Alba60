@@ -34,6 +34,8 @@ const DICT: Record<string, Record<Lang, string>> = {
   "game.victory": { en: "Victory", sw: "Ushindi" },
   "game.defeat": { en: "Defeat", sw: "Kushindwa" },
   "game.reconnecting": { en: "Reconnecting…", sw: "Inaunganisha…" },
+  "game.endgame": { en: "Endgame", sw: "Mwisho" },
+  "game.cardsLeft": { en: "cards left", sw: "kadi zimebaki" },
 
   // Oracle
   "oracle.playThis": { en: "Play this card", sw: "Cheza kadi hii" },
