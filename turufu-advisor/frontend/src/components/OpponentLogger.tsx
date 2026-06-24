@@ -54,7 +54,7 @@ export default function OpponentLogger({ onCardSelected, onClose, unavailableCar
               </div>
 
               {/* Rank buttons */}
-              <div className="flex-1 grid grid-cols-9 gap-1">
+              <div className="flex-1 grid grid-cols-9 gap-1 md:gap-2">
                 {RANKS.map((rank) => {
                   const card: CardData = { suit, rank };
                   const key = cardKey(card);
@@ -66,7 +66,7 @@ export default function OpponentLogger({ onCardSelected, onClose, unavailableCar
                       disabled={isUsed}
                       onPointerDown={() => { if (!isUsed) handleTap(card); }}
                       className={`
-                        flex-1 h-10 rounded-lg text-xs font-bold
+                        flex-1 h-10 md:h-14 rounded-lg md:rounded-xl text-xs md:text-base font-bold
                         transition-all duration-200 border
                         ${isUsed
                           ? "bg-game-bg/30 border-game-border/30 text-ink-dim/30 line-through cursor-not-allowed opacity-40"

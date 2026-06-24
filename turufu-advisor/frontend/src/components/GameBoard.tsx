@@ -356,10 +356,10 @@ export default function GameBoard() {
                 const isRed = SUIT_COLORS[suit] === "red";
                 return (
                   <div key={suit} className="flex items-center gap-2">
-                    <div className={`w-8 h-8 flex items-center justify-center rounded-full glass-panel shrink-0 ${isRed ? "text-suit-red bg-suit-redDim" : "text-white bg-suit-blackDim"}`}>
-                      <span className="text-lg leading-none drop-shadow-md">{SUIT_SYMBOLS[suit]}</span>
+                    <div className={`w-8 h-8 md:w-12 md:h-12 flex items-center justify-center rounded-full glass-panel shrink-0 ${isRed ? "text-suit-red bg-suit-redDim" : "text-white bg-suit-blackDim"}`}>
+                      <span className="text-lg md:text-2xl leading-none drop-shadow-md">{SUIT_SYMBOLS[suit]}</span>
                     </div>
-                    <div className="flex-1 grid grid-cols-9 gap-1">
+                    <div className="flex-1 grid grid-cols-9 gap-1 md:gap-2">
                       {["A","7","K","J","Q","6","5","4","3"].map((rank) => {
                         const key = `${rank}_${suit}`;
                         const isSel = drawSelected.has(key);
@@ -379,7 +379,7 @@ export default function GameBoard() {
                               });
                             }}
                             className={`
-                              flex-1 h-10 rounded-lg text-xs font-bold transition-all duration-200 border
+                              flex-1 h-10 md:h-14 rounded-lg md:rounded-xl text-xs md:text-base font-bold transition-all duration-200 border
                               ${isUsed
                                 ? "bg-game-bg/30 border-game-border/30 text-ink-dim/30 line-through cursor-not-allowed opacity-40"
                                 : isSel

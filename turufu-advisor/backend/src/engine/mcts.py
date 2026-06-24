@@ -173,12 +173,73 @@ def evaluate_state(state: GameState, maximizing_player: int = 0) -> float:
     return score
 
 
-# ---------------------------------------------------------------------------
-# Random Playout (Rollout Policy)
-# ---------------------------------------------------------------------------
-def random_playout(state: GameState, maximizing_player: int = 0) -> float:
+def _heuristic_pick(moves: list, state: GameState, player_id: int) -> Card:
     """
-    Play the game to completion with random moves.
+    Smart rollout card selection — not random, not exhaustive.
+    
+    Albastini strategy principles:
+    - LEADING: Play LOW cards to bait opponent into wasting value
+    - FOLLOWING (can win): Play CHEAPEST winner to save big guns
+    - FOLLOWING (can't win): Dump lowest-value card (don't waste points)
+    - TRUMP CONSERVATION: Only trump when pot value justifies it
+    - ACE HOLDING: Save Aces/7s to capture opponent's big tricks
+    """
+    trump = state.trump_suit
+    trick = state.current_trick
+    is_leading = len(trick.plays) == 0
+    
+    if is_leading:
+        # --- LEADING STRATEGY ---
+        # Play LOW value non-trump cards to bait opponent
+        # Save trumps and high cards for capturing
+        non_trump = [c for c in moves if c.suit != trump]
+        pool = non_trump if non_trump else moves
+        
+        # Prefer low-point, low-power cards when leading
+        return min(pool, key=lambda c: (c.points * 10 + c.power))
+    
+    else:
+        # --- FOLLOWING STRATEGY ---
+        lead_card = trick.plays[0].card
+        lead_suit = lead_card.suit
+        pot_value = trick.points  # Points currently on the table
+        
+        # Cards that can WIN this trick
+        winners = []
+        losers = []
+        for c in moves:
+            # Check if this card would beat the current best
+            test_trick = Trick()
+            for tp in trick.plays:
+                test_trick.plays.append(tp)
+            test_trick.plays.append(TrickPlay(player_id, c))
+            if test_trick.winner(trump) == player_id:
+                winners.append(c)
+            else:
+                losers.append(c)
+        
+        if winners:
+            # Can win — but should we?
+            if pot_value >= 4:
+                # Pot is worth winning — use CHEAPEST winner
+                return min(winners, key=lambda c: (c.points * 10 + c.power))
+            else:
+                # Low-value pot — only win if we can use a zero-point card
+                cheap_winners = [c for c in winners if c.points == 0]
+                if cheap_winners:
+                    return min(cheap_winners, key=lambda c: c.power)
+                # Otherwise dump a loser to save our good cards
+                if losers:
+                    return min(losers, key=lambda c: (c.points * 10 + c.power))
+                return min(winners, key=lambda c: (c.points * 10 + c.power))
+        else:
+            # Can't win — dump lowest value card
+            return min(losers, key=lambda c: (c.points * 10 + c.power))
+
+
+def smart_playout(state: GameState, maximizing_player: int = 0) -> float:
+    """
+    Play the game to completion with heuristic moves (not random).
     Returns the heuristic evaluation of the terminal state.
     """
     sim = deepcopy(state)
@@ -202,7 +263,7 @@ def random_playout(state: GameState, maximizing_player: int = 0) -> float:
                 continue
             break
 
-        card = random.choice(moves)
+        card = _heuristic_pick(moves, sim, player_id)
         sim.play_card(player_id, card)
 
     return evaluate_terminal(sim, maximizing_player)
@@ -316,7 +377,7 @@ class ISMCTSEngine:
                     node = child
 
                 # ROLLOUT — random playout to terminal state
-                reward = random_playout(sim_state, maximizing_player=0)
+                reward = smart_playout(sim_state, maximizing_player=0)
 
                 # BACKPROPAGATE — update all ancestors
                 while node is not None:
