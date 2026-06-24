@@ -38,6 +38,27 @@ services:
     networks:
       - dokploy-network
 
+  # ── DEBUG SERVICE ─────────────────────────────────────────────────────────
+  # traefik/whoami responds with request headers + container info.
+  # If https://debug.144.91.69.240.nip.io works → Traefik labels + network OK.
+  # If it also 404s → the network name 'dokploy-network' is wrong.
+  # Remove this service once routing is confirmed.
+  debug:
+    image: traefik/whoami
+    container_name: alba60-debug
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alba60-debug.rule=Host(`debug.144.91.69.240.nip.io`)"
+      - "traefik.http.routers.alba60-debug.entrypoints=websecure"
+      - "traefik.http.routers.alba60-debug.tls.certresolver=letsencrypt"
+      - "traefik.http.services.alba60-debug.loadbalancer.server.port=80"
+      # Also try plain HTTP in case TLS is the issue
+      - "traefik.http.routers.alba60-debug-http.rule=Host(`debug.144.91.69.240.nip.io`)"
+      - "traefik.http.routers.alba60-debug-http.entrypoints=web"
+      - "traefik.http.services.alba60-debug-http.loadbalancer.server.port=80"
+
 volumes:
   backend_logs:
 
