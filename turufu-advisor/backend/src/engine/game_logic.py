@@ -317,6 +317,7 @@ class GameState:
         draw_order = [winner_id, loser_id]
 
         cards_drawn = 0
+        user_drew = 0
         if self.draw_pile_size > 0:
             for pid in draw_order:
                 player = self.players[pid]
@@ -325,10 +326,13 @@ class GameState:
                 self.draw_pile_size -= actual_draw
                 player.actual_hand_size += actual_draw
                 cards_drawn += actual_draw
+                if pid == 0:
+                    user_drew = actual_draw
                 # For user (player 0), drawn cards will be registered via API
                 # For opponents, cards remain in remaining_unknown
-            # Mark that user must register their drawn card before advice runs
-            self.user_draw_pending = True
+            # Only require draw registration if the user actually drew cards
+            if user_drew > 0:
+                self.user_draw_pending = True
 
         # Prepare next trick
         self.current_trick = Trick()
