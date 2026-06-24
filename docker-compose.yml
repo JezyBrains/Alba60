@@ -17,6 +17,8 @@ services:
       timeout: 10s
       retries: 5
       start_period: 15s
+    networks:
+      - dokploy-network
 
   frontend:
     build:
@@ -33,6 +35,23 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alba60.rule=Host(`alba.144.91.69.240.nip.io`)"
+      - "traefik.http.routers.alba60.entrypoints=websecure"
+      - "traefik.http.routers.alba60.tls.certresolver=letsencrypt"
+      - "traefik.http.services.alba60.loadbalancer.server.port=3000"
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.alba60-http.rule=Host(`alba.144.91.69.240.nip.io`)"
+      - "traefik.http.routers.alba60-http.entrypoints=web"
+      - "traefik.http.routers.alba60-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
 
 volumes:
   backend_logs:
+
+networks:
+  dokploy-network:
+    external: true
