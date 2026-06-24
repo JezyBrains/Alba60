@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./turufu-advisor/backend
+    container_name: alba60-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+    volumes:
+      - backend_logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./turufu-advisor/frontend
+      args:
+        - NEXT_PUBLIC_API_URL=http://${ALBA_DOMAIN:-localhost}:8000
+        - NEXT_PUBLIC_WS_URL=ws://${ALBA_DOMAIN:-localhost}:8000/ws/game
+    container_name: alba60-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  backend_logs:
