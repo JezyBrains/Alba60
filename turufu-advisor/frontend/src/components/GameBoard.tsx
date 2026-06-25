@@ -33,19 +33,23 @@ export default function GameBoard() {
     return cardKey(advice.best_card);
   }, [advice]);
 
-  // Cards that are unavailable for drawing (already played, in hand, or known opponent)
+
+  // Cards unavailable for OPPONENT LOGGING (played + user hand + current trick)
+  // NOTE: opponent_known_hand is NOT included — those are the valid cards the opponent CAN play!
   const unavailableCards = useMemo(() => {
     const keys = new Set<string>();
-    // Cards already played in the game
     for (const c of state?.played_cards || []) keys.add(cardKey(c));
-    // Cards currently in user's hand
     for (const c of state?.user_hand || []) keys.add(cardKey(c));
-    // Cards in the current trick (being played right now)
     for (const tp of state?.current_trick || []) keys.add(cardKey(tp.card));
-    // Known opponent hand cards
+    return keys;
+  }, [state?.played_cards, state?.user_hand, state?.current_trick]);
+
+  // Cards unavailable for DRAWING (all of the above + opponent's known hand)
+  const unavailableForDraw = useMemo(() => {
+    const keys = new Set(unavailableCards);
     for (const c of state?.opponent_known_hand || []) keys.add(cardKey(c));
     return keys;
-  }, [state?.played_cards, state?.user_hand, state?.current_trick, state?.opponent_known_hand]);
+  }, [unavailableCards, state?.opponent_known_hand]);
 
   // Sync inputMode to backend turn_index
   useEffect(() => {
@@ -166,7 +170,7 @@ export default function GameBoard() {
         <div className="glass-panel p-10 flex flex-col items-center gap-5 w-full max-w-sm relative overflow-hidden">
           {/* Subtle glow behind the panel text */}
           <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1/2 blur-[50px] rounded-full opacity-20 pointer-events-none ${won ? 'bg-oracle-glow' : 'bg-oracle-danger'}`}></div>
-          
+
           <p className="text-white/50 text-[0.65rem] font-medium tracking-[0.3em] uppercase relative z-10">{t("game.gameOver")}</p>
           <h1 className={`text-5xl font-extrabold relative z-10 drop-shadow-lg ${won ? "text-oracle-glow" : "text-oracle-danger"}`}>
             {won ? (skunked ? "MRITHI" : t("game.victory").toUpperCase()) : t("game.defeat").toUpperCase()}
@@ -202,9 +206,9 @@ export default function GameBoard() {
   }
 
   // ---- PLAYING / DRAWING ----
-  const userPts  = state?.scores?.[0] || 0;
-  const oppPts   = state?.scores?.[1] || 0;
-  const winLine  = (61 / 120) * 100;
+  const userPts = state?.scores?.[0] || 0;
+  const oppPts = state?.scores?.[1] || 0;
+  const winLine = (61 / 120) * 100;
 
   return (
     <div className="min-h-dvh bg-game flex flex-col relative overflow-hidden">
@@ -352,7 +356,7 @@ export default function GameBoard() {
             </p>
             {/* Quick draw grid */}
             <div className="space-y-3">
-              {["SPADES","HEARTS","DIAMONDS","CLUBS"].map((suit) => {
+              {["SPADES", "HEARTS", "DIAMONDS", "CLUBS"].map((suit) => {
                 const isRed = SUIT_COLORS[suit] === "red";
                 return (
                   <div key={suit} className="flex items-center gap-2">
@@ -360,10 +364,10 @@ export default function GameBoard() {
                       <span className="text-lg md:text-2xl leading-none drop-shadow-md">{SUIT_SYMBOLS[suit]}</span>
                     </div>
                     <div className="flex-1 grid grid-cols-9 gap-1 md:gap-2">
-                      {["A","7","K","J","Q","6","5","4","3"].map((rank) => {
+                      {["A", "7", "K", "J", "Q", "6", "5", "4", "3"].map((rank) => {
                         const key = `${rank}_${suit}`;
                         const isSel = drawSelected.has(key);
-                        const isUsed = unavailableCards.has(key);
+                        const isUsed = unavailableForDraw.has(key);
                         const needed = HAND_SIZE - (state?.user_hand.length || 0);
                         return (
                           <button
@@ -405,8 +409,8 @@ export default function GameBoard() {
               className={`
                 mt-6 w-full py-4 rounded-2xl text-sm font-extrabold tracking-[0.25em] uppercase
                 transition-all duration-300 active:scale-[0.98] relative overflow-hidden
-                ${drawSelected.size > 0 
-                  ? "bg-oracle-glow text-game-bg shadow-neon hover:shadow-[0_0_25px_rgba(0,255,157,0.7)]" 
+                ${drawSelected.size > 0
+                  ? "bg-oracle-glow text-game-bg shadow-neon hover:shadow-[0_0_25px_rgba(0,255,157,0.7)]"
                   : "bg-game-glass border border-game-border text-ink-dim pointer-events-none"}
               `}
             >

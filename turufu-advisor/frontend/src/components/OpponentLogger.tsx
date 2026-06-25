@@ -28,7 +28,7 @@ export default function OpponentLogger({ onCardSelected, onClose, unavailableCar
     <div className="animate-slide-up bg-game-glass backdrop-blur-xl border-t border-game-border pt-4 pb-2 px-3 rounded-t-3xl shadow-glass mt-2">
       {/* Header */}
       <div className="flex items-center justify-between px-2 mb-4">
-        <span className="text-oracle-danger text-[0.65rem] font-bold tracking-[0.25em] uppercase drop-shadow-sm">
+        <span className="text-oracle-danger text-[0.65rem] md:text-sm font-bold tracking-[0.25em] uppercase drop-shadow-sm">
           {t("game.logOpponent")}
         </span>
         {onClose && (
@@ -49,8 +49,8 @@ export default function OpponentLogger({ onCardSelected, onClose, unavailableCar
           return (
             <div key={suit} className="flex items-center gap-2">
               {/* Suit label */}
-              <div className={`w-8 h-8 flex items-center justify-center rounded-full glass-panel shrink-0 ${isRed ? "text-suit-red bg-suit-redDim" : "text-white bg-suit-blackDim"}`}>
-                <span className="text-lg leading-none drop-shadow-md">{SUIT_SYMBOLS[suit]}</span>
+              <div className={`w-8 h-8 md:w-12 md:h-12 flex items-center justify-center rounded-full glass-panel shrink-0 ${isRed ? "text-suit-red bg-suit-redDim" : "text-white bg-suit-blackDim"}`}>
+                <span className="text-lg md:text-2xl leading-none drop-shadow-md">{SUIT_SYMBOLS[suit]}</span>
               </div>
 
               {/* Rank buttons */}
@@ -66,11 +66,11 @@ export default function OpponentLogger({ onCardSelected, onClose, unavailableCar
                       disabled={isUsed}
                       onPointerDown={() => { if (!isUsed) handleTap(card); }}
                       className={`
-                        flex-1 h-10 md:h-14 rounded-lg md:rounded-xl text-xs md:text-base font-bold
-                        transition-all duration-200 border
+                        flex-1 h-10 md:h-14 rounded-lg md:rounded-xl text-sm md:text-lg font-bold
+                        transition-all duration-200 border flex items-center justify-center
                         ${isUsed
-                          ? "bg-game-bg/30 border-game-border/30 text-ink-dim/30 line-through cursor-not-allowed opacity-40"
-                          : "bg-game-glass border-game-border text-ink-muted hover:bg-game-glassHover hover:text-white active:scale-90 active:shadow-neon"
+                          ? "bg-game-surface/40 border-white/5 text-white/15 line-through cursor-not-allowed"
+                          : "bg-game-surface border-white/20 text-white hover:bg-white/20 hover:border-white/40 active:scale-90 active:shadow-neon"
                         }
                       `}
                     >
